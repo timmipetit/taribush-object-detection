@@ -101,13 +101,24 @@ def detect_scene():
     if not ret:
         return (None, 0)
 
-    img = cv2.resize(frame, (width, height))
+    # Convert BGR to RGB
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    # Center crop to square before resizing to avoid squishing
+    h, w, _ = frame_rgb.shape
+    size = min(h, w)
+    start_y = (h - size) // 2
+    start_x = (w - size) // 2
+    cropped = frame_rgb[start_y:start_y+size, start_x:start_x+size]
+
+    img = cv2.resize(cropped, (width, height))
     input_data = np.expand_dims(img, axis=0)
 
-    # Match the model's expected input type
+    # Normalize based on model type
     input_type = input_details[0]['dtype']
     if input_type == np.float32:
-        input_data = (input_data / 255.0).astype(np.float32)
+        # Teachable Machine (MobileNet) expects -1.0 to 1.0
+        input_data = (input_data.astype(np.float32) / 127.5) - 1.0
     else:
         input_data = input_data.astype(np.uint8)
 
@@ -116,8 +127,7 @@ def detect_scene():
     output_data = interpreter.get_tensor(output_details[0]['index'])[0]
 
     top_index = int(np.argmax(output_data))
-    # Float models output probabilities directly, quantized models need /255
-    if output_data[top_index] > 1.0:
+    if input_type == np.uint8 or output_data[top_index] > 1.0:
         confidence = output_data[top_index] / 255.0
     else:
         confidence = float(output_data[top_index])

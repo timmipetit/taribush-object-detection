@@ -23,7 +23,12 @@ def find_usb_content():
             stick_path = os.path.join(user_path, stick)
             if not os.path.isdir(stick_path):
                 continue
-            for f in os.listdir(stick_path):
+            try:
+                entries = os.listdir(stick_path)
+            except OSError as e:
+                print(f"Skipping {stick_path}: {e}")
+                continue
+            for f in entries:
                 if f.endswith(".tflite"):
                     return (stick_path, os.path.join(stick_path, f))
     return (None, None)
